@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import sys
+import sip
+sip.setapi('QString', 2)
 from PyQt4.QtGui import QApplication
 
 import terminal

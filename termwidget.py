@@ -10,6 +10,9 @@ class _ExpandableTextEdit(QTextEdit):
     
     returnPressed = pyqtSignal(unicode)
     
+    historyNext = pyqtSignal()
+    historyPrev = pyqtSignal()
+    
     def __init__(self, *args):
         QTextEdit.__init__(self, *args)
         self._fittedHeight = 0
@@ -30,8 +33,26 @@ class _ExpandableTextEdit(QTextEdit):
     def keyPressEvent(self, event):
         if event.matches(QKeySequence.InsertParagraphSeparator):
             self.returnPressed.emit(self.toPlainText())
-        else:
-            QTextEdit.keyPressEvent(self, event)
+            return
+        elif event.matches(QKeySequence.MoveToNextLine):
+            text = self.toPlainText()
+            cursorPos = self.textCursor().position()
+            textBeforeEnd = text[cursorPos:]
+            if len(textBeforeEnd.splitlines()) <= 1:
+                self.historyNext.emit()
+                return
+        elif event.matches(QKeySequence.MoveToPreviousLine):
+            text = self.toPlainText()
+            cursorPos = self.textCursor().position()
+            textBeforeStart = text[:cursorPos]
+            lineCount = len(textBeforeStart.splitlines())
+            if textBeforeStart.endswith('\n') or textBeforeStart.endswith('\r'):
+                lineCount += 1
+            if lineCount <= 1:
+                self.historyPrev.emit()
+                return
+        
+        QTextEdit.keyPressEvent(self, event)
 
 class TermWidget(QWidget):
     """Widget wich represents terminal. It only displays text and allows to enter text.
@@ -49,6 +70,8 @@ class TermWidget(QWidget):
 
         self._edit = _ExpandableTextEdit(self)
         self._edit.returnPressed.connect(self.returnPressed)
+        self._edit.historyNext.connect(self._onHistoryNext)
+        self._edit.historyPrev.connect(self._onHistoryPrev)
         self.setFocusProxy(self._edit)
 
         layout = QVBoxLayout(self)
@@ -57,8 +80,11 @@ class TermWidget(QWidget):
         layout.addWidget(self._browser)
         layout.addWidget(self._edit)
         
+        self._history = ['']  # current empty line
+        self._historyIndex = 0
+        
         self._edit.setFocus()
-            
+
     def _format(self, style, text):
         """Convert text to HTML for inserting it to browser
         """
@@ -91,13 +117,19 @@ class TermWidget(QWidget):
         
         
         return text
-        
-        
-    def echo(self):
-        """Append text from input to output
+
+    def execCurrentCommand(self):
+        """Save current command in the history. Append it to the log. Clear edit line
         """
-        self._browser.append(self._format('in', self._edit.toPlainText()))
-    
+        text = self._edit.toPlainText()
+        self._browser.append(self._format('in', text))
+        
+        self._history.insert(-1, text)
+        self._historyIndex = len(self._history) - 1
+        
+        self._history[-1] = ''
+        self._edit.clear()
+
     def appendOutput(self, text):
         """Appent text to output widget
         """
@@ -108,7 +140,14 @@ class TermWidget(QWidget):
         """
         self._browser.append(self._format('err', text))
 
-    def clearEdit(self):
-        """Clear edit line
-        """
-        self._edit.clear()
+    def _onHistoryNext(self):
+        if (self._historyIndex + 1) < len(self._history):
+            self._historyIndex += 1
+            self._edit.setPlainText(self._history[self._historyIndex])
+
+    def _onHistoryPrev(self):
+        if self._historyIndex > 0:
+            if self._historyIndex == (len(self._history) - 1):
+                self._history[-1] = self._edit.toPlainText()
+            self._historyIndex -= 1
+            self._edit.setPlainText(self._history[self._historyIndex])

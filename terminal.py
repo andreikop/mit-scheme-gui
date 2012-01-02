@@ -12,8 +12,7 @@ class SysShell:
         self._popen = None
     
     def _onReturnPressed(self, text):
-        self._term.echo()
-        self._term.clearEdit()
+        self._term.execCurrentCommand()
         
         popen = subprocess.Popen(str(text), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = popen.communicate()
