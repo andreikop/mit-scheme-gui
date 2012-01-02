@@ -1,7 +1,37 @@
 import cgi
 
 from PyQt4.QtCore import pyqtSignal
-from PyQt4.QtGui import QColor, QLineEdit, QPalette, QTextEdit, QVBoxLayout, QWidget
+from PyQt4.QtGui import QColor, QKeySequence, QLineEdit, QPalette, \
+                        QSizePolicy, QTextEdit, QVBoxLayout, QWidget
+
+class _ExpandableTextEdit(QTextEdit):
+    """Class implements edit line, which expands themselves automatically
+    """
+    
+    returnPressed = pyqtSignal(unicode)
+    
+    def __init__(self, *args):
+        QTextEdit.__init__(self, *args)
+        self._fittedHeight = 0
+        self.textChanged.connect(self._fitToDocument)
+        self._fitToDocument()
+
+    def sizeHint(self):
+        hint = QTextEdit.sizeHint(self)
+        hint.setHeight(self._fittedHeight)
+        return hint
+    
+    def _fitToDocument(self):
+        documentSize = self.document().size().toSize()
+        self._fittedHeight = documentSize.height() + (self.height() - self.viewport().height())
+        self.setMaximumHeight(self._fittedHeight)
+        self.updateGeometry();
+    
+    def keyPressEvent(self, event):
+        if event.matches(QKeySequence.InsertParagraphSeparator):
+            self.returnPressed.emit(self.toPlainText())
+        else:
+            QTextEdit.keyPressEvent(self, event)
 
 class TermWidget(QWidget):
     """Widget wich represents terminal. It only displays text and allows to enter text.
@@ -17,10 +47,9 @@ class TermWidget(QWidget):
         self._browser = QTextEdit(self)
         self._browser.setReadOnly(True)
 
-        self._edit = QLineEdit(self)
-        self._edit.returnPressed.connect(self._onReturnPressed)
+        self._edit = _ExpandableTextEdit(self)
+        self._edit.returnPressed.connect(self.returnPressed)
         self.setFocusProxy(self._edit)
-        self._edit.setFocus()
 
         layout = QVBoxLayout(self)
         layout.setSpacing(0)
@@ -28,8 +57,7 @@ class TermWidget(QWidget):
         layout.addWidget(self._browser)
         layout.addWidget(self._edit)
         
-        self._browser.append(self._format('in', 'hello, world'))
-        self._browser.append(self._format('err', 'hello, world'))
+        self._edit.setFocus()
             
     def _format(self, style, text):
         """Convert text to HTML for inserting it to browser
@@ -68,7 +96,7 @@ class TermWidget(QWidget):
     def echo(self):
         """Append text from input to output
         """
-        self._browser.append(self._format('in', self._edit.text()))
+        self._browser.append(self._format('in', self._edit.toPlainText()))
     
     def appendOutput(self, text):
         """Appent text to output widget
@@ -84,8 +112,3 @@ class TermWidget(QWidget):
         """Clear edit line
         """
         self._edit.clear()
-
-    def _onReturnPressed(self):
-        """Handler of Enter pressing in the lineedit
-        """
-        self.returnPressed.emit(self._edit.text())
