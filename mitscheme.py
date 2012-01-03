@@ -11,6 +11,7 @@ except ImportError:
 
 import sip
 sip.setapi('QString', 2)
+from PyQt4.QtCore import QTimer
 from PyQt4.QtGui import QApplication
 
 import termwidget
@@ -87,7 +88,11 @@ class MitSchemeShell:
         self._term.returnPressed.connect(self._onReturnPressed)
         self._term.show()
         self._bufferedPopen = BufferedPopen("scheme", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
+        
+        self._processOutputTimer = QTimer()  # I use Qt timer, because we must append data to GUI in the GUI thread
+        self._processOutputTimer.timeout.connect(self._processOutput)
+        self._processOutputTimer.start(100)
+
     def __del__(self):
         self._bufferedPopen.terminate()
 
@@ -95,14 +100,16 @@ class MitSchemeShell:
         return True
     
     def _onReturnPressed(self, text):
+        self._processOutput() # write old output to the log, and only then write fresh input
         if self._isCommandComplete(text):
             self._term.execCurrentCommand()
             self._bufferedPopen.write(text)
-            time.sleep(0.5)
+    
+    def _processOutput(self):
+        line = self._bufferedPopen.read()
+        while line is not None:
+            self._term.appendOutput(line)
             line = self._bufferedPopen.read()
-            while line is not None:
-                self._term.appendOutput(line)
-                line = self._bufferedPopen.read()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
