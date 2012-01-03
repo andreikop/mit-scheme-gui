@@ -1,9 +1,17 @@
+#!/usr/bin/env python
+
+import sys
 import subprocess
+
+import sip
+sip.setapi('QString', 2)
+from PyQt4.QtGui import QApplication
+
 
 import termwidget
 
 class SysShell:
-    """System shell. Test for terminal widget
+    """System shell. Test for terminal widget. Don't try to reuse it as a real system shell
     """
     def __init__(self):
         self._term = termwidget.TermWidget()
@@ -36,3 +44,11 @@ class SysShell:
                 self._term.appendOutput(stdout)
             if stderr:
                 self._term.appendError(stderr)
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+
+    shell = SysShell()
+
+    app.exec_()
