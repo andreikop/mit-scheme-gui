@@ -1,3 +1,7 @@
+"""Terminal emulator widget.
+Shows intput and output text. Allows to enter commands. Supports history.
+"""
+
 import cgi
 
 from PyQt4.QtCore import pyqtSignal
@@ -20,17 +24,23 @@ class _ExpandableTextEdit(QTextEdit):
         self._fitToDocument()
 
     def sizeHint(self):
+        """QWidget sizeHint impelemtation
+        """
         hint = QTextEdit.sizeHint(self)
         hint.setHeight(self._fittedHeight)
         return hint
     
     def _fitToDocument(self):
+        """Update widget height to fit all text
+        """
         documentSize = self.document().size().toSize()
         self._fittedHeight = documentSize.height() + (self.height() - self.viewport().height())
         self.setMaximumHeight(self._fittedHeight)
         self.updateGeometry();
     
     def keyPressEvent(self, event):
+        """Catch keywoard events. Process Enter, Up, Down
+        """
         if event.matches(QKeySequence.InsertParagraphSeparator):
             QTextEdit.keyPressEvent(self, event)
             self.returnPressed.emit(self.toPlainText())
@@ -147,11 +157,15 @@ class TermWidget(QWidget):
         self._browser.append(self._format('err', text))
 
     def _onHistoryNext(self):
+        """Down pressed, show next item from the history
+        """
         if (self._historyIndex + 1) < len(self._history):
             self._historyIndex += 1
             self._edit.setPlainText(self._history[self._historyIndex])
 
     def _onHistoryPrev(self):
+        """Up pressed, show previous item from the history
+        """
         if self._historyIndex > 0:
             if self._historyIndex == (len(self._history) - 1):
                 self._history[-1] = self._edit.toPlainText()
