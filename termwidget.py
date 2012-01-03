@@ -140,6 +140,9 @@ class TermWidget(QWidget):
         text = self._edit.toPlainText()
         self._browser.append(self._format('in', text))
         
+        if text.endswith('\n'):  # Don't need to add \n to the history
+            text = text[:-1]
+
         self._history.insert(-1, text)
         self._historyIndex = len(self._history) - 1
         
