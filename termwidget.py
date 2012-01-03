@@ -32,6 +32,7 @@ class _ExpandableTextEdit(QTextEdit):
     
     def keyPressEvent(self, event):
         if event.matches(QKeySequence.InsertParagraphSeparator):
+            QTextEdit.keyPressEvent(self, event)
             self.returnPressed.emit(self.toPlainText())
             return
         elif event.matches(QKeySequence.MoveToNextLine):
@@ -91,6 +92,10 @@ class TermWidget(QWidget):
         assert style in ('in', 'out', 'err')
 
         text = cgi.escape(text)
+        
+        if text.endswith('\n'):
+            text = text[:-1]
+        
         text = text.replace('\n', '<br/>')
         
         if style != 'out':
@@ -114,7 +119,8 @@ class TermWidget(QWidget):
             
             bg = QColor.fromHsvF(h, s, v).name()
             text = '<span style="background-color: %s;">%s</span>' % (bg, text)
-        
+        else:
+            text = '<span>%s</span>' % text
         
         return text
 
