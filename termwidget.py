@@ -6,7 +6,8 @@ import cgi
 
 from PyQt4.QtCore import pyqtSignal
 from PyQt4.QtGui import QColor, QKeySequence, QLineEdit, QPalette, \
-                        QSizePolicy, QTextEdit, QVBoxLayout, QWidget
+                        QSizePolicy, QTextCursor, QTextEdit, \
+                        QVBoxLayout, QWidget
 
 class _ExpandableTextEdit(QTextEdit):
     """Class implements edit line, which expands themselves automatically
@@ -96,15 +97,12 @@ class TermWidget(QWidget):
         
         self._edit.setFocus()
 
-    def _format(self, style, text):
+    def _appendToBrowser(self, style, text):
         """Convert text to HTML for inserting it to browser
         """
         assert style in ('in', 'out', 'err')
 
         text = cgi.escape(text)
-        
-        if text.endswith('\n'):
-            text = text[:-1]
         
         text = text.replace('\n', '<br/>')
         
@@ -130,15 +128,16 @@ class TermWidget(QWidget):
             bg = QColor.fromHsvF(h, s, v).name()
             text = '<span style="background-color: %s;">%s</span>' % (bg, text)
         else:
-            text = '<span>%s</span>' % text
+            text = '<span>%s</span>' % text  # without span <br/> is ignored!!!
         
-        return text
+        self._browser.moveCursor(QTextCursor.End)
+        self._browser.insertHtml(text)
 
     def execCurrentCommand(self):
         """Save current command in the history. Append it to the log. Clear edit line
         """
         text = self._edit.toPlainText()
-        self._browser.append(self._format('in', text))
+        self._appendToBrowser('in', text)
         
         if text.endswith('\n'):  # Don't need to add \n to the history
             text = text[:-1]
@@ -152,12 +151,12 @@ class TermWidget(QWidget):
     def appendOutput(self, text):
         """Appent text to output widget
         """
-        self._browser.append(self._format('out', text))
+        self._appendToBrowser('out', text)
 
     def appendError(self, text):
         """Appent error text to output widget. Text is drawn with red background
         """
-        self._browser.append(self._format('err', text))
+        self._appendToBrowser('err', text)
 
     def _onHistoryNext(self):
         """Down pressed, show next item from the history
