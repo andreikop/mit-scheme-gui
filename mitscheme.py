@@ -17,6 +17,7 @@ from PyQt4.QtCore import QTimer
 from PyQt4.QtGui import QApplication
 
 import termwidget
+import highlighter
 
 class BufferedPopen(subprocess.Popen):
     """Bufferred version of Popen.
@@ -89,6 +90,8 @@ class MitSchemeShell:
     def __init__(self):
         self._term = termwidget.TermWidget()
         self._term.returnPressed.connect(self._onReturnPressed)
+        
+        hl = highlighter.SchemeHighlighter(self._term._edit)
         self._term.show()
         
         env = copy.copy(os.environ)
