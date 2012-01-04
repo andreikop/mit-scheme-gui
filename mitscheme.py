@@ -118,7 +118,9 @@ class MitSchemeShell:
             self._bufferedPopen.write(text)
     
     def _processOutput(self):
-        self._term.appendOutput(self._bufferedPopen.read())
+        output = self._bufferedPopen.read()
+        if output:
+            self._term.appendOutput(output)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
