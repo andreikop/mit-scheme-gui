@@ -140,7 +140,10 @@ class TermWidget(QWidget):
         text = self._edit.toPlainText()
         self._appendToBrowser('in', text + '\n')
 
-        self._history.insert(-1, text)
+        if len(self._history) < 2 or\
+           self._history[-2] != text:  # don't insert duplicating items
+            self._history.insert(-1, text)
+
         self._historyIndex = len(self._history) - 1
         
         self._history[-1] = ''
