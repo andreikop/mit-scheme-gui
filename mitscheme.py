@@ -113,6 +113,8 @@ class MitSchemeShell:
     
     def _onReturnPressed(self, text):
         self._processOutput() # write old output to the log, and only then write fresh input
+        if not text.endswith('\n'):
+            text += '\n'  # MIT scheme won't execute command without newline
         if self._isCommandComplete(text):
             self._term.execCurrentCommand()
             self._bufferedPopen.write(text)

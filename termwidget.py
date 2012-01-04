@@ -43,7 +43,6 @@ class _ExpandableTextEdit(QTextEdit):
         """Catch keywoard events. Process Enter, Up, Down
         """
         if event.matches(QKeySequence.InsertParagraphSeparator):
-            QTextEdit.keyPressEvent(self, event)
             self.returnPressed.emit(self.toPlainText())
             return
         elif event.matches(QKeySequence.MoveToNextLine):
@@ -139,10 +138,7 @@ class TermWidget(QWidget):
         """Save current command in the history. Append it to the log. Clear edit line
         """
         text = self._edit.toPlainText()
-        self._appendToBrowser('in', text)
-        
-        if text.endswith('\n'):  # Don't need to add \n to the history
-            text = text[:-1]
+        self._appendToBrowser('in', text + '\n')
 
         self._history.insert(-1, text)
         self._historyIndex = len(self._history) - 1
