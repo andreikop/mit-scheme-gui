@@ -50,10 +50,12 @@ class BufferedPopen(subprocess.Popen):
     def _readOutputThread(self):
         """Reader function. Reads output from process to queue
         """
-        line = self.stdout.readline()
-        while line:
-            self._outQueue.put(line)
-            line = self.stdout.readline()
+        # hlamer: Reading output by one character is not effective, but, I don't know 
+        # how to implement non-blocking reading of not full lines better
+        char = self.stdout.read(1)
+        while char:
+            self._outQueue.put(char)
+            char = self.stdout.read(1)
             
 
     def _writeInputThread(self):
@@ -74,10 +76,9 @@ class BufferedPopen(subprocess.Popen):
     def read(self):
         """Read data from the subprocess
         """
-        try:
-            text = self._outQueue.get(False)
-        except Empty:
-            text = None
+        text = ''
+        while not self._outQueue.empty():
+            text += self._outQueue.get(False)
         return text
 
 class MitSchemeShell:
@@ -106,10 +107,7 @@ class MitSchemeShell:
             self._bufferedPopen.write(text)
     
     def _processOutput(self):
-        line = self._bufferedPopen.read()
-        while line is not None:
-            self._term.appendOutput(line)
-            line = self._bufferedPopen.read()
+        self._term.appendOutput(self._bufferedPopen.read())
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
