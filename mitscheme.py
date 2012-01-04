@@ -3,6 +3,8 @@ import subprocess
 import time
 import sys
 import threading
+import os
+import copy
 
 try:
     from Queue import Queue, Empty
@@ -88,7 +90,16 @@ class MitSchemeShell:
         self._term = termwidget.TermWidget()
         self._term.returnPressed.connect(self._onReturnPressed)
         self._term.show()
-        self._bufferedPopen = BufferedPopen("scheme", stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        env = copy.copy(os.environ)
+        env['COLUMNS'] = str(2**16)  # Don't need to break lines in the mit scheme. It will be done by text edit
+        env['LINES'] = '25'
+        
+        self._bufferedPopen = BufferedPopen("scheme",
+                                            stdin=subprocess.PIPE,
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE,
+                                            env=env)
         
         self._processOutputTimer = QTimer()  # I use Qt timer, because we must append data to GUI in the GUI thread
         self._processOutputTimer.timeout.connect(self._processOutput)
