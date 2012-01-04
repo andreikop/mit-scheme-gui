@@ -79,6 +79,8 @@ class TermWidget(QWidget):
         QWidget.__init__(self, *args)
         self._browser = QTextEdit(self)
         self._browser.setReadOnly(True)
+        self._browser.document().setDefaultStyleSheet(self._browser.document().defaultStyleSheet() + 
+                                                      "span {white-space:pre;}")
 
         self._edit = _ExpandableTextEdit(self)
         self._edit.returnPressed.connect(self.returnPressed)
