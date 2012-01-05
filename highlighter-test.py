@@ -15,7 +15,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     edit = QTextEdit()
-    hl = highlighter.SchemeHighlighter(edit)
+    hl = highlighter.Highlighter(edit)
     
     edit.setPlainText(code)
     edit.show()

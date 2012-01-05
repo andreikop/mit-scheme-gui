@@ -91,7 +91,7 @@ class MitSchemeShell:
         self._term = termwidget.TermWidget()
         self._term.returnPressed.connect(self._onReturnPressed)
         
-        hl = highlighter.SchemeHighlighter(self._term._edit)
+        hl = highlighter.Highlighter(self._term._edit)
         self._term.show()
         
         env = copy.copy(os.environ)
