@@ -13,7 +13,14 @@ code = \
 (define func (x)
     (map (lambda (y) (+ x y))
         x))
+
+(display "hello, define world")
 """
+
+code1 = \
+''' "a"
+ "b"
+'''
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
