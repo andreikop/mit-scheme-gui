@@ -101,6 +101,7 @@ class Highlighter(QSyntaxHighlighter):
     def __init__(self, textEdit):
         QSyntaxHighlighter.__init__(self, textEdit)
         self._textEdit = textEdit
+        textEdit.setFont(QFont("Monospace"))
 
         self._bracePattern = re.compile('[\(\)]')
 
