@@ -63,6 +63,9 @@ class _ExpandableTextEdit(QTextEdit):
             if lineCount <= 1:
                 self.historyPrev.emit()
                 return
+        elif event.matches(QKeySequence.MoveToNextPage) or \
+             event.matches(QKeySequence.MoveToPreviousPage):
+            return self._termWidget.browser().keyPressEvent(event)
         
         QTextEdit.keyPressEvent(self, event)
 
@@ -186,6 +189,9 @@ class TermWidget(QWidget):
         """
         return True
     
+    def browser(self):
+        return self._browser
+
     def _onHistoryNext(self):
         """Down pressed, show next item from the history
         """
