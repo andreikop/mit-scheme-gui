@@ -20,34 +20,55 @@ from PyQt4.QtGui import QApplication
 import termwidget
 import highlighter
 
-class BufferedPopen(subprocess.Popen):
+class BufferedPopen:
     """Bufferred version of Popen.
     Never locks, but uses unlimited buffers. May eat all the system memory, if something goes wrong.
     Output blocks are split to lines"""
     
-    def __init__(self, *args, **kwargs):
-        subprocess.Popen.__init__(self, *args, **kwargs)
+    def __init__(self, command):
+        self._command = command
+        self._error = None
+        
         self._mustDie = False
         self._inQueue = Queue()
         self._outQueue = Queue()
 
+        self._inThread = None
+        self._outThread = None
+
+        self.start()
+
+    def start(self):
+        env = copy.copy(os.environ)
+        env['COLUMNS'] = str(2**16)  # Don't need to break lines in the mit scheme. It will be done by text edit
+        env['LINES'] = '25'
+        self._popen = subprocess.Popen(self._command,
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+
         self._inThread = threading.Thread(target=self._writeInputThread)
         self._outThread = threading.Thread(target=self._readOutputThread)
-        
+
         self._inThread.start()
         self._outThread.start()
 
     def terminate(self):
         self._mustDie = True
-        subprocess.Popen.terminate(self)
+        
+        try:
+            self._popen.terminate()
+        except OSError:  # OK, it is already dead
+            pass
+            
         for i in range(5):
-            if self.poll() is None:
+            if self._popen.poll() is None:
                 time.sleep(0.04)
             else:
                 break
         else:
-            self.kill()
-            self.wait()
+            self._popen.kill()
+            self._popen.wait()
 
         if self._inThread.is_alive():
             self._inThread.join()
@@ -59,10 +80,10 @@ class BufferedPopen(subprocess.Popen):
         """
         # hlamer: Reading output by one character is not effective, but, I don't know 
         # how to implement non-blocking reading of not full lines better
-        char = self.stdout.read(1)
+        char = self._popen.stdout.read(1)
         while char:
             self._outQueue.put(char)
-            char = self.stdout.read(1)
+            char = self._popen.stdout.read(1)
             
 
     def _writeInputThread(self):
@@ -73,16 +94,31 @@ class BufferedPopen(subprocess.Popen):
                 text = self._inQueue.get(True, 0.1)
             except Empty:
                 continue
-            self.stdin.write(text)
+            self._popen.stdin.write(text)
     
+    def _restartIfDead(self):
+        if self._popen.poll() is not None:  # Ooops, the process is dead
+            self._error = 'Oops. MIT Scheme is dead. Restarting it...\n'
+            self.terminate()
+            self.start()
+
     def write(self, text):
         """Write data to the subprocess
         """
+        self._restartIfDead()
         self._inQueue.put(text)  # TODO test on big blocks of text. Make nonblocking even if queue is full
     
-    def read(self):
-        """Read data from the subprocess
+    def readError(self):
+        """Read error messages from the class itself
         """
+        ret = self._error
+        self._error = None
+        return ret
+
+    def readOutput(self):
+        """Read stdout data from the subprocess
+        """
+        self._restartIfDead()
         text = ''
         while not self._outQueue.empty():
             text += self._outQueue.get(False)
@@ -134,15 +170,7 @@ class MitSchemeShell:
         
         self._term.show()
         
-        env = copy.copy(os.environ)
-        env['COLUMNS'] = str(2**16)  # Don't need to break lines in the mit scheme. It will be done by text edit
-        env['LINES'] = '25'
-        
-        self._bufferedPopen = BufferedPopen("scheme",
-                                            stdin=subprocess.PIPE,
-                                            stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE,
-                                            env=env)
+        self._bufferedPopen = BufferedPopen("scheme")
         
         self._processOutputTimer = QTimer()  # I use Qt timer, because we must append data to GUI in the GUI thread
         self._processOutputTimer.timeout.connect(self._processOutput)
@@ -159,7 +187,11 @@ class MitSchemeShell:
         self._bufferedPopen.write(text)
     
     def _processOutput(self):
-        output = self._bufferedPopen.read()
+        error = self._bufferedPopen.readError()
+        if error:
+            self._term.appendError(error)
+        
+        output = self._bufferedPopen.readOutput()
         if output:
             self._term.appendOutput(output)
 
