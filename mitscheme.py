@@ -27,15 +27,16 @@ class BufferedPopen(subprocess.Popen):
     
     def __init__(self, *args, **kwargs):
         subprocess.Popen.__init__(self, *args, **kwargs)
-        
         self._mustDie = False
         self._inQueue = Queue()
         self._outQueue = Queue()
+
         self._inThread = threading.Thread(target=self._writeInputThread)
         self._outThread = threading.Thread(target=self._readOutputThread)
+        
         self._inThread.start()
         self._outThread.start()
-    
+
     def terminate(self):
         self._mustDie = True
         subprocess.Popen.terminate(self)
@@ -48,8 +49,10 @@ class BufferedPopen(subprocess.Popen):
             self.kill()
             self.wait()
 
-        self._inThread.join()
-        self._outThread.join()
+        if self._inThread.is_alive():
+            self._inThread.join()
+        if self._outThread.is_alive():
+            self._outThread.join()
 
     def _readOutputThread(self):
         """Reader function. Reads output from process to queue
@@ -148,6 +151,9 @@ class MitSchemeShell:
     def __del__(self):
         self._bufferedPopen.terminate()
     
+    def terminate(self):
+        self._bufferedPopen.terminate()
+    
     def execCommand(self, text):
         self._processOutput() # write old output to the log, and only then write fresh input
         self._bufferedPopen.write(text)
@@ -163,5 +169,5 @@ if __name__ == '__main__':
     shell = MitSchemeShell()
 
     app.exec_()
-    
-    del shell
+
+    shell.terminate()
