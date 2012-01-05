@@ -136,20 +136,24 @@ class Highlighter(QSyntaxHighlighter):
         return re.compile(pattern)
 
     def highlightBlock(self, text):
+        self._updateStringIndex(text)
+        self._updateBraceIndex(text)
+
+        # Highlight keywords, standard functions etc.
         for style, pattern in self._patternsToApply.items():
             for match in pattern.finditer(text):
-                self.setFormat(match.start(), len(match.group(0)), DEFAULT_STYLE[style])
-
-        self._updateBraceIndex(text)
-        self._updateStringIndex(text)
+                if not self._insideString(match.start()):
+                    self.setFormat(match.start(), len(match.group(0)), DEFAULT_STYLE[style])
         
+        # Highlight strings
         for foundString in self.currentBlockUserData().foundStrings:
             self.setFormat(foundString.pos, foundString.len, DEFAULT_STYLE["string"])
     
     def _updateBraceIndex(self, text):
         foundBraces = []
         for match in self._bracePattern.finditer(text):
-            foundBraces.append(_FoundBrace(self.currentBlock(), match.start(), match.group(0)))
+            if not self._insideString(match.start()):
+                foundBraces.append(_FoundBrace(self.currentBlock(), match.start(), match.group(0)))
         
         data = self.currentBlockUserData()
         if data is None:
@@ -224,29 +228,45 @@ class Highlighter(QSyntaxHighlighter):
             data = QTextBlockUserData()
         data.foundStrings = foundStrings
         self.setCurrentBlockUserData(data)
+    
+    def _insideString(self, pos, block=None):
+        """Check if position is inside a string. i.e. keyword and braces in a string must not be highlighted
+        """
+        if block is None:
+            block_ = self.currentBlock()
+        else:
+            block_ = block
+        
+        for foundString in block_.userData().foundStrings:
+            endPos = foundString.pos + foundString.len - 1
+            if pos > endPos:
+                return False
+            elif pos > foundString.pos:
+                return True
 
     def _onCursorPositionChanged(self):
         cursor = self._textEdit.textCursor()
+        block = cursor.block()
         pos = None
         brace = None
         if not cursor.atBlockStart():
-            charBefore = cursor.block().text()[cursor.positionInBlock() - 1]
-            if self._bracePattern.match(charBefore):
+            charBefore = block.text()[cursor.positionInBlock() - 1]
+            if self._bracePattern.match(charBefore) and not self._insideString(cursor.positionInBlock() - 1, block):
                 pos = cursor.positionInBlock() - 1
                 brace = charBefore
         if brace is None:
             if not cursor.atBlockEnd():
-                charAfter = cursor.block().text()[cursor.positionInBlock()]
-                if self._bracePattern.match(charAfter):
+                charAfter = block.text()[cursor.positionInBlock()]
+                if self._bracePattern.match(charAfter) and not self._insideString(cursor.positionInBlock(), block):
                     pos = cursor.positionInBlock()
                     brace = charAfter
         
         selections = []
         if brace is not None:
-            matchedBrace = self._findMatchingBrace(cursor.block(), pos, brace)
+            matchedBrace = self._findMatchingBrace(block, pos, brace)
             if matchedBrace is not None:
                 selections.append(self._makeBraceExtraSelection(matchedBrace.block, matchedBrace.pos, True))
-                selections.append(self._makeBraceExtraSelection(cursor.block(), pos, True))
+                selections.append(self._makeBraceExtraSelection(block, pos, True))
             else:
-                selections.append(self._makeBraceExtraSelection(cursor.block(), pos, False))
+                selections.append(self._makeBraceExtraSelection(block, pos, False))
         self._textEdit.setExtraSelections(selections)

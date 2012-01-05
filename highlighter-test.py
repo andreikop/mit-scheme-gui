@@ -17,10 +17,7 @@ code = \
 (display "hello, define world")
 """
 
-code1 = \
-''' "a"
- "b"
-'''
+code1 = '  "fuck("  )'
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
