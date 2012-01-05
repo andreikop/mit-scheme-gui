@@ -129,8 +129,18 @@ class TermWidget(QWidget):
         else:
             text = '<span>%s</span>' % text  # without span <br/> is ignored!!!
         
+        scrollBar = self._browser.verticalScrollBar()
+        oldValue = scrollBar.value()
+        scrollAtTheEnd = oldValue == scrollBar.maximum()
+        
         self._browser.moveCursor(QTextCursor.End)
         self._browser.insertHtml(text)
+        
+        if scrollAtTheEnd:
+            scrollBar.setValue(scrollBar.maximum())
+        else:
+            scrollBar.setValue(oldValue)
+            
 
     def execCurrentCommand(self):
         """Save current command in the history. Append it to the log. Clear edit line
