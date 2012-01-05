@@ -5,6 +5,7 @@ import sys
 import threading
 import os
 import copy
+import re
 
 try:
     from Queue import Queue, Empty
@@ -84,14 +85,50 @@ class BufferedPopen(subprocess.Popen):
             text += self._outQueue.get(False)
         return text
 
+class _MitSchemeTermWidget(termwidget.TermWidget):
+    def __init__(self, mitScheme, *args):
+        termwidget.TermWidget.__init__(self, *args)
+        self._mitScheme = mitScheme
+        self._hl = highlighter.Highlighter(self._edit)
+
+    def isCommandComplete(self, text):
+        # TODO support comments
+        # Stage 1: remove strings
+        index = 0
+        foundStrings = []
+        while True:
+            try:
+                index = text.index('"', index)
+            except ValueError:
+                break;
+            
+            try:
+                endIndex = text.index('"', index + 1)
+            except ValueError:
+                return False
+
+            foundStrings.append((index, endIndex))
+            index = endIndex + 1
+
+        for foundString in foundStrings[::-1]:  # from the last found string
+            text = text[:foundString[0]] + text[foundString[1] + 1:]  # remove found string
+        
+        # Stage 2: calculate braces
+        # Let's MIT scheme check if braces are placed correctly. We just check count
+        if text.count('(') != text.count(')'):
+            return False
+        
+        return True
+
+    def childExecCommand(self, text):
+        self._mitScheme.execCommand(text)
+
 class MitSchemeShell:
     """MIT scheme shell. Implements REPL. Graphical frontend for original terminal version.
     """
     def __init__(self):
-        self._term = termwidget.TermWidget()
-        self._term.returnPressed.connect(self._onReturnPressed)
+        self._term = _MitSchemeTermWidget(self)
         
-        hl = highlighter.Highlighter(self._term._edit)
         self._term.show()
         
         env = copy.copy(os.environ)
@@ -110,17 +147,10 @@ class MitSchemeShell:
 
     def __del__(self):
         self._bufferedPopen.terminate()
-
-    def _isCommandComplete(self, text):
-        return True
     
-    def _onReturnPressed(self, text):
+    def execCommand(self, text):
         self._processOutput() # write old output to the log, and only then write fresh input
-        if not text.endswith('\n'):
-            text += '\n'  # MIT scheme won't execute command without newline
-        if self._isCommandComplete(text):
-            self._term.execCurrentCommand()
-            self._bufferedPopen.write(text)
+        self._bufferedPopen.write(text)
     
     def _processOutput(self):
         output = self._bufferedPopen.read()

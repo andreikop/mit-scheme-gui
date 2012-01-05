@@ -13,16 +13,15 @@ class _ExpandableTextEdit(QTextEdit):
     """Class implements edit line, which expands themselves automatically
     """
     
-    returnPressed = pyqtSignal(unicode)
-    
     historyNext = pyqtSignal()
     historyPrev = pyqtSignal()
     
-    def __init__(self, *args):
+    def __init__(self, termWidget, *args):
         QTextEdit.__init__(self, *args)
         self._fittedHeight = 0
         self.textChanged.connect(self._fitToDocument)
         self._fitToDocument()
+        self._termWidget = termWidget
 
     def sizeHint(self):
         """QWidget sizeHint impelemtation
@@ -43,8 +42,10 @@ class _ExpandableTextEdit(QTextEdit):
         """Catch keywoard events. Process Enter, Up, Down
         """
         if event.matches(QKeySequence.InsertParagraphSeparator):
-            self.returnPressed.emit(self.toPlainText())
-            return
+            text = self.toPlainText()
+            if self._termWidget.isCommandComplete(text):
+                self._termWidget.execCurrentCommand()
+                return
         elif event.matches(QKeySequence.MoveToNextLine):
             text = self.toPlainText()
             cursorPos = self.textCursor().position()
@@ -72,8 +73,6 @@ class TermWidget(QWidget):
     User pressed Enter. Client class should decide, if command must be executed or user may continue edit it
     """
 
-    returnPressed = pyqtSignal(unicode)
-
     def __init__(self, *args):
         QWidget.__init__(self, *args)
         self._browser = QTextEdit(self)
@@ -81,8 +80,7 @@ class TermWidget(QWidget):
         self._browser.document().setDefaultStyleSheet(self._browser.document().defaultStyleSheet() + 
                                                       "span {white-space:pre;}")
 
-        self._edit = _ExpandableTextEdit(self)
-        self._edit.returnPressed.connect(self.returnPressed)
+        self._edit = _ExpandableTextEdit(self, self)
         self._edit.historyNext.connect(self._onHistoryNext)
         self._edit.historyPrev.connect(self._onHistoryPrev)
         self.setFocusProxy(self._edit)
@@ -136,6 +134,7 @@ class TermWidget(QWidget):
 
     def execCurrentCommand(self):
         """Save current command in the history. Append it to the log. Clear edit line
+        Reimplement in the child classes to actually execute command
         """
         text = self._edit.toPlainText()
         self._appendToBrowser('in', text + '\n')
@@ -148,6 +147,19 @@ class TermWidget(QWidget):
         
         self._history[-1] = ''
         self._edit.clear()
+        
+        if not text.endswith('\n'):
+            text += '\n'
+
+        self.childExecCommand(text)
+    
+    def childExecCommand(self, text):
+        """Reimplement in the child classes
+        """
+        pass
+    
+    def addLineBreakToInput(self):
+        self._edit.textCursor().insertText('\n')
 
     def appendOutput(self, text):
         """Appent text to output widget
@@ -159,6 +171,11 @@ class TermWidget(QWidget):
         """
         self._appendToBrowser('err', text)
 
+    def isCommandComplete(self, text):
+        """Executed by _ExpandableTextEdit. Reimplement this function in the child classes.
+        """
+        return True
+    
     def _onHistoryNext(self):
         """Down pressed, show next item from the history
         """
