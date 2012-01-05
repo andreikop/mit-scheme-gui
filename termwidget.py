@@ -165,6 +165,7 @@ class TermWidget(QWidget):
         if (self._historyIndex + 1) < len(self._history):
             self._historyIndex += 1
             self._edit.setPlainText(self._history[self._historyIndex])
+            self._edit.moveCursor(QTextCursor.End)
 
     def _onHistoryPrev(self):
         """Up pressed, show previous item from the history
@@ -174,3 +175,4 @@ class TermWidget(QWidget):
                 self._history[-1] = self._edit.toPlainText()
             self._historyIndex -= 1
             self._edit.setPlainText(self._history[self._historyIndex])
+            self._edit.moveCursor(QTextCursor.End)
