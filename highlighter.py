@@ -119,7 +119,8 @@ class Highlighter(QSyntaxHighlighter):
                                   'number':           self._makePatternFromList(self.NUMBERS),
                                 }
 
-        textEdit.cursorPositionChanged.connect(self._onCursorPositionChanged)
+        textEdit.cursorPositionChanged.connect(self._rehighlightMatchingBraces)
+        textEdit.textChanged.connect(self._rehighlightMatchingBraces)  # When user presses Del, cursor is not moved
 
     def _makePatternFromList(self, strings):
         for s in strings:
@@ -244,7 +245,7 @@ class Highlighter(QSyntaxHighlighter):
             elif pos > foundString.pos:
                 return True
 
-    def _onCursorPositionChanged(self):
+    def _rehighlightMatchingBraces(self):
         cursor = self._textEdit.textCursor()
         block = cursor.block()
         pos = None
