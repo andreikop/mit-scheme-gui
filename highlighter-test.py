@@ -9,7 +9,11 @@ from PyQt4.QtGui import QApplication, QTextEdit
 import highlighter
 
 code = \
-"hello, world"
+"""
+(define func (x)
+    (map (lambda (y) (+ x y))
+        x))
+"""
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

@@ -1,6 +1,6 @@
 import re
 
-from PyQt4.QtGui import QColor, QSyntaxHighlighter, \
+from PyQt4.QtGui import QColor, QFont, QSyntaxHighlighter, \
                         QTextBlockUserData, QTextCharFormat, QTextCursor, QTextEdit
 
 
@@ -42,39 +42,94 @@ class _FoundBracesIterator:
                     if self._block.isValid():
                         self._index = len(self._block.userData().foundBraces) - 1
 
-class Style:
-    def __init__(self):
-        self.defaultBackground = QColor("#ffffff")
-        self.defaultForeground = QColor("#000000")
-        # TODO generate own QPalette
-        self.matchedBrace = self._makeFormat("#ffff7f", "#ff0000")
-        self.unMatchedBrace = self._makeFormat("#ff0000", "#ffffff")
-    
-    def _makeFormat(self, background, foreground):
-        format = QTextCharFormat()
-        format.setBackground(QColor(background))
-        format.setForeground(QColor(foreground))
-        return format
+def _makeFormat(bg=None, fg=None, bold=False):
+    format = QTextCharFormat()
+    if bg is not None:
+        format.setBackground(QColor(bg))
+    if fg is not None:
+        format.setForeground(QColor(fg))
+    if bold:
+        format.setFontWeight(QFont.Bold)
+
+    return format
+
+# TODO have own QPalette
+DEFAULT_STYLE = {   'defaultBackground':    QColor("#ffffff"),
+                    'defaultForeground':    QColor("#000000"),
+                    'matchedBrace':         _makeFormat(bg="#ffff7f", fg="#ff0000"),
+                    'unMatchedBrace':       _makeFormat(bg="#ff0000", fg="#ffffff"),
+                    'keyword':              _makeFormat(bold=True),
+                    'standardFunction':     _makeFormat(fg="#000080", bold=True),
+                    'number':               _makeFormat(fg='#008080'),
+                }
 
 class Highlighter(QSyntaxHighlighter):
     """Scheme (Lisp dialect) syntax highlighter
     """
+    KEYWORDS = ("case\-lambda", "call/cc", "class", "define\-class", "exit\-handler", "field", "import", "inherit", 
+    "init\-field", "interface", "let\*\-values", "let\-values", "let/ec", "mixin", "opt\-lambda", "override", "protect",
+    "provide", "public", "rename", "require", "require\-for\-syntax", "syntax", "syntax\-case", "syntax\-error", "unit/sig",
+    "unless", "when", "with\-syntax", "and", "begin", "call\-with\-current\-continuation", "call\-with\-input\-file",
+    "call\-with\-output\-file", "case", "cond", "define", "define\-syntax", "delay", "do", "dynamic\-wind", "else",
+    "for\-each", "if", "lambda", "let", "let\*", "let\-syntax", "letrec", "letrec\-syntax", "map", "or", "syntax\-rules")
+    
+    STANDARD_FUNCTIONS = ("'", "\*", "\+", ",", ",@", "\-", "\.\.\.", "/", ";", "<", "<=", "=", "<=", ">", ">=", "`", "abs",
+    "acos", "angle", "append", "apply", "asin", "assoc", "assq", "assv", "atan", "boolean\?", "caar", "cadr",
+    "call\-with\-input\-file", "call\-with\-output\-file", "call\-with\-values", "car", "cdddar", "cddddr", "cdr", "ceiling", 
+    "char\->integer", "char\-alphabetic\?", "char\-ci<=\?", "char\-ci<\?", "char\-ci=\?", "char\-ci>=\?", "char\-ci>\?",
+    "char\-downcase", "char\-lower\-case\?", "char\-numeric\?", "char\-ready\?", "char\-upcase", "char\-upper\-case\?",
+    "char\-whitespace\?", "char<=\?", "char<\?", "char=\?", "char>=\?", "char>\?", "char\?", "close\-input\-port",
+    "close\-output\-port", "complex\?","cons", "cos", "current\-input\-port", "current\-output\-port", "denominator",
+    "display", "eof\-object\?", "eq\?",
+    "equal\?", "eqv\?", "eval", "even\?", "exact\->inexact", "exact\?", "exp", "expt", "#f", "floor", "force", "gcd", 
+    "imag\-part", "inexact\->exact", "inexact\?", "input\-port\?", "integer\->char", "integer\?", "interaction\-environment",
+    "lcm", "length", "list", "list\->string", "list\->vector", "list\-ref", "list\-tail", "list\?", "load", "log",
+    "magnitude", "make\-polar", "make\-rectangular", "make\-string", "make\-vector", "max", "member", "memq", "memv", "min",
+    "modulo", "negative\?", "newline", "not", "null\-environment", "null\?", "number\->string", "number\?", "numerator",
+    "odd\?", "open\-input\-file", "open\-output\-file", "output\-port\?", "pair\?", "peek\-char", "port\?", "positive\?",
+    "procedure\?", "quasiquote", "quote", "quotient", "rational\?", "rationalize", "read", "read\-char", "real\-part",
+    "real\?", "remainder", "reverse", "round", "scheme\-report\-environment", "set!", "set\-car!", "set\-cdr!", "sin",
+    "sqrt", "string", "string\->list", "string\->number", "string\->symbol", "string\-append", "string\-ci<=\?",
+    "string\-ci<\?", "string\-ci=\?", "string\-ci>=\?", "string\-ci>\?", "string\-copy", "string\-fill!", "string\-length",
+    "string\-ref", "string\-set!", "string<=\?", "string<\?", "string=\?", "string>=\?", "string>\?", "string\?", "substring", 
+    "symbol\->string", "symbol\?", "#t", "tan", "transcript\-off", "transcript\-on", "truncate", "values", "vector", 
+    "vector\->list", "vector\-fill!", "vector\-length", "vector\-ref", "vector\-set!", "with\-input\-from\-file",
+    "with\-output\-to\-file", "write", "write\-char", "zero\?")
+    
+    NUMBERS = (r"\d", )
 
     def __init__(self, textEdit):
         QSyntaxHighlighter.__init__(self, textEdit)
         self._textEdit = textEdit
 
-        self._style = Style()
-        
-        #self._textEdit.setTextBackgroundColor(self._style.defaultBackground)
-        #self._textEdit.setTextColor(self._style.defaultForeground)
-
         self._bracePattern = re.compile('[\(\)]')
+
+        self._patternsToApply = { 'keyword':          self._makePatternFromList(self.KEYWORDS),
+                                  'standardFunction': self._makePatternFromList(self.STANDARD_FUNCTIONS),
+                                  'number':           self._makePatternFromList(self.NUMBERS),
+                                }
 
         textEdit.cursorPositionChanged.connect(self._onCursorPositionChanged)
 
+    def _makePatternFromList(self, strings):
+        for s in strings:
+            if s[0].isalnum():
+                s = r'\b' + s
+            else:
+                s = r'[^\b]' + s
+            if s[-1].isalnum():
+                s = s + r'\b'
+            else:
+                s = s + r'[^\b]'
+
+        pattern = '|'.join(strings)  # join to one pattern
+        return re.compile(pattern)
+
     def highlightBlock(self, text):
-        #self.setFormat(0, 7, QColor("red"))
+        for style, pattern in self._patternsToApply.items():
+            for match in pattern.finditer(text):
+                self.setFormat(match.start(), len(match.group(0)), DEFAULT_STYLE[style])
+
         self._generateBraceIndex(text)
     
     def _generateBraceIndex(self, text):
@@ -145,7 +200,7 @@ class Highlighter(QSyntaxHighlighter):
         sel.cursor.setPosition(block.position() + pos, QTextCursor.MoveAnchor)
         sel.cursor.setPosition(block.position() + pos + 1, QTextCursor.KeepAnchor)
         if matched:
-            sel.format = self._style.matchedBrace
+            sel.format = DEFAULT_STYLE['matchedBrace']
         else:
-            sel.format = self._style.unMatchedBrace
+            sel.format = DEFAULT_STYLE['unMatchedBrace']
         return sel
