@@ -139,6 +139,13 @@ class TermWidget(QWidget):
         self._browser.moveCursor(QTextCursor.End)
         self._browser.insertHtml(text)
         
+        """TODO When user enters second line to the input, and input is resized, scrollbar changes its positon
+        and stops moving. As quick fix of this problem, now we always scroll down when add new text.
+        To fix it correctly, srcoll to the bottom, if before intput has been resized, 
+        scrollbar was in the bottom, and remove next lien
+        """
+        scrollAtTheEnd = True
+        
         if scrollAtTheEnd:
             scrollBar.setValue(scrollBar.maximum())
         else:
