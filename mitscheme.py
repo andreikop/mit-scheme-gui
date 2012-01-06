@@ -20,6 +20,7 @@ from PyQt4.QtGui import QApplication
 import termwidget
 import highlighter
 
+
 class BufferedPopen:
     """Bufferred version of Popen.
     Never locks, but uses unlimited buffers. May eat all the system memory, if something goes wrong.
@@ -27,16 +28,12 @@ class BufferedPopen:
     
     def __init__(self, command):
         self._command = command
-        self._error = None
         
-        self._mustDie = False
         self._inQueue = Queue()
         self._outQueue = Queue()
 
         self._inThread = None
         self._outThread = None
-
-        self.start()
 
     def start(self):
         env = copy.copy(os.environ)
@@ -50,10 +47,11 @@ class BufferedPopen:
         self._inThread = threading.Thread(target=self._writeInputThread)
         self._outThread = threading.Thread(target=self._readOutputThread)
 
+        self._mustDie = False
         self._inThread.start()
         self._outThread.start()
 
-    def terminate(self):
+    def stop(self):
         self._mustDie = True
         
         try:
@@ -74,6 +72,9 @@ class BufferedPopen:
             self._inThread.join()
         if self._outThread.is_alive():
             self._outThread.join()
+    
+    def isAlive(self):
+        return self._popen.poll() is None
 
     def _readOutputThread(self):
         """Reader function. Reads output from process to queue
@@ -94,31 +95,19 @@ class BufferedPopen:
                 text = self._inQueue.get(True, 0.1)
             except Empty:
                 continue
+
             self._popen.stdin.write(text)
-    
-    def _restartIfDead(self):
-        if self._popen.poll() is not None:  # Ooops, the process is dead
-            self._error = 'Oops. MIT Scheme is dead. Restarting it...\n'
-            self.terminate()
-            self.start()
 
     def write(self, text):
         """Write data to the subprocess
         """
-        self._restartIfDead()
+        if not self.isAlive():  # Ooops, the process is dead
+            raise RuntimeWarning("Process is not running")
         self._inQueue.put(text)  # TODO test on big blocks of text. Make nonblocking even if queue is full
-    
-    def readError(self):
-        """Read error messages from the class itself
-        """
-        ret = self._error
-        self._error = None
-        return ret
 
     def readOutput(self):
         """Read stdout data from the subprocess
         """
-        self._restartIfDead()
         text = ''
         while not self._outQueue.empty():
             text += self._outQueue.get(False)
@@ -170,30 +159,41 @@ class MitSchemeShell:
         
         self._term.show()
         
-        self._bufferedPopen = BufferedPopen("scheme")
-        
         self._processOutputTimer = QTimer()  # I use Qt timer, because we must append data to GUI in the GUI thread
         self._processOutputTimer.timeout.connect(self._processOutput)
-        self._processOutputTimer.start(100)
+        self._processOutputTimer.setInterval(100)
+
+        self._bufferedPopen = BufferedPopen("scheme")
+        self._schemeIsRunning = False
+        
+        self._term.appendOutput("Execute any command to run scheme interpreter\n")
 
     def __del__(self):
-        self._bufferedPopen.terminate()
+        self.stop()
     
-    def terminate(self):
-        self._bufferedPopen.terminate()
+    def start(self):
+        self._bufferedPopen.start()
+        self._processOutputTimer.start()
+        self._schemeIsRunning = True
+
+    def stop(self):
+        self._processOutputTimer.stop()
+        self._bufferedPopen.stop()
+        self._schemeIsRunning = False
     
     def execCommand(self, text):
+        if not self._schemeIsRunning:
+            self.start()
         self._processOutput() # write old output to the log, and only then write fresh input
         self._bufferedPopen.write(text)
     
     def _processOutput(self):
-        error = self._bufferedPopen.readError()
-        if error:
-            self._term.appendError(error)
-        
         output = self._bufferedPopen.readOutput()
         if output:
             self._term.appendOutput(output)
+        if self._schemeIsRunning and not self._bufferedPopen.isAlive():
+            self._term.appendError("Interpreter process exited. Execute any command to run it again\n")
+            self.stop()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
@@ -202,4 +202,4 @@ if __name__ == '__main__':
 
     app.exec_()
 
-    shell.terminate()
+    shell.stop()
