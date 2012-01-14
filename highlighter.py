@@ -1,3 +1,11 @@
+"""
+highlighter --- QSyntaxHighlighter implementation
+=================================================
+
+Currently this implementation is hardcoded for Scheme language, has limited functionality and 
+used only for MIT Scheme terminal. But, it will probably be generic and configurable for any language
+"""
+
 import re
 
 from PyQt4.QtGui import QColor, QFont, QSyntaxHighlighter, \
@@ -5,12 +13,16 @@ from PyQt4.QtGui import QColor, QFont, QSyntaxHighlighter, \
 
 
 class _FoundBrace:
+    """Container structure for found in a block brace
+    """
     def __init__(self, block, pos, brace):
         self.pos = pos
         self.brace = brace
         self.block = block
 
 class _FoundBracesIterator:
+    """Iterator over all braces in the document
+    """
     def __init__(self, block, index, forward):
         self._block = block
         self._index = index
@@ -43,11 +55,15 @@ class _FoundBracesIterator:
                         self._index = len(self._block.userData().foundBraces) - 1
 
 class _FoundString:
+    """Container structure for found in a block string (quoted sequence of chars)
+    """
     def __init__(self, pos, len):
         self.pos = pos
         self.len = len
 
 def _makeFormat(bg=None, fg=None, bold=False):
+    """Make QTextCharFormat with gived parameters
+    """
     format = QTextCharFormat()
     if bg is not None:
         format.setBackground(QColor(bg))
@@ -63,14 +79,14 @@ DEFAULT_STYLE = {   'defaultBackground':    QColor("#ffffff"),
                     'defaultForeground':    QColor("#000000"),
                     'matchedBrace':         _makeFormat(bg="#ffff7f", fg="#ff0000"),
                     'unMatchedBrace':       _makeFormat(bg="#ff0000", fg="#ffffff"),
-                    'keyword':              _makeFormat(bold=True),
-                    'standardFunction':     _makeFormat(fg="#000080", bold=True),
-                    'number':               _makeFormat(fg='#008080'),
-                    'string':               _makeFormat(fg='#800080'),
+                    'keyword':              _makeFormat(fg="#008000", bold=True),
+                    'standardFunction':     _makeFormat(fg="#008000"),
+                    'number':               _makeFormat(fg='#666666'),
+                    'string':               _makeFormat(fg='#BA2121'),
                 }
 
 class Highlighter(QSyntaxHighlighter):
-    """Scheme (Lisp dialect) syntax highlighter
+    """Scheme (Lisp dialect) syntax highlighter. See module description
     """
     KEYWORDS = ("case-lambda", "call/cc", "class", "define-class", "exit-handler", "field", "import", "inherit", 
     "init-field", "interface", "let\*-values", "let-values", "let/ec", "mixin", "opt-lambda", "override", "protect",
@@ -123,20 +139,22 @@ class Highlighter(QSyntaxHighlighter):
         textEdit.textChanged.connect(self._rehighlightMatchingBraces)  # When user presses Del, cursor is not moved
 
     def _makePatternFromList(self, strings):
+        """Convert list of patterns for keywords, etc to one long pattern
+        """
+        modifiedStrings = []
         for s in strings:
             if s[0].isalnum():
                 s = r'\b' + s
-            else:
-                s = r'[^\b]' + s
             if s[-1].isalnum():
                 s = s + r'\b'
-            else:
-                s = s + r'[^\b]'
+            modifiedStrings.append(s)
 
-        pattern = '|'.join(strings)  # join to one pattern
+        pattern = '|'.join(modifiedStrings)  # join to one pattern
         return re.compile(pattern)
 
     def highlightBlock(self, text):
+        """QSyntaxHighlighter.highlightBlock implementation. Does all job
+        """
         self._updateStringIndex(text)
         self._updateBraceIndex(text)
 
@@ -151,6 +169,8 @@ class Highlighter(QSyntaxHighlighter):
             self.setFormat(foundString.pos, foundString.len, DEFAULT_STYLE["string"])
     
     def _updateBraceIndex(self, text):
+        """Regenerate index of found braces for a block
+        """
         foundBraces = []
         for match in self._bracePattern.finditer(text):
             if not self._insideString(match.start()):
@@ -163,6 +183,8 @@ class Highlighter(QSyntaxHighlighter):
         self.setCurrentBlockUserData(data)
     
     def _findMatchingBrace(self, block, pos, brace):
+        """Find matching brace for the brace
+        """
         foundBraces = block.userData().foundBraces
         braceIndex = None
         for index, foundBrace in enumerate(foundBraces):
@@ -189,6 +211,8 @@ class Highlighter(QSyntaxHighlighter):
         return None
 
     def _makeBraceExtraSelection(self, block, pos, matched):
+        """Make QTextEdit.ExtraSelection for highlighted brace
+        """
         sel = QTextEdit.ExtraSelection()
         sel.cursor = QTextCursor(block)
         sel.cursor.setPosition(block.position() + pos, QTextCursor.MoveAnchor)
@@ -200,7 +224,9 @@ class Highlighter(QSyntaxHighlighter):
         return sel
 
     def _updateStringIndex(self, text):
-        """This algorythm is suitable for either multiline strings and multiline comments.
+        """Regenerate index of found strings.
+        
+        This algorythm is suitable for either multiline strings and multiline comments.
         There are no any difference for highlighter
         """
         block = self.currentBlock()
@@ -246,6 +272,8 @@ class Highlighter(QSyntaxHighlighter):
                 return True
 
     def _rehighlightMatchingBraces(self):
+        """Rehighlight matching braces after cursor has been moved or text has been changed
+        """
         cursor = self._textEdit.textCursor()
         block = cursor.block()
         pos = None
